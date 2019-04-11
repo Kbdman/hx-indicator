@@ -2266,3 +2266,11 @@ QString toEasyRead(unsigned long long number, int precision, int effectiveBitsNu
 
 
 
+
+void DbgThread::run()
+{
+    if(this->pid!=0)
+    {
+
+    }
+}

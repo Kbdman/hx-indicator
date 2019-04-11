@@ -384,7 +384,14 @@ struct ExchangeBalance
     unsigned long long locked = 0;
     unsigned long long available = 0;
 };
-
+class DbgThread:public QThread
+{
+    Q_OBJECT
+public:
+    uint64_t pid;
+protected:
+    void run();
+};
 class HXChain : public QObject
 {
     Q_OBJECT
