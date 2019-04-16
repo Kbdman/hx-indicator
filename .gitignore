@@ -1,3 +1,5 @@
 *.user
 *.autosave
 *.DS_Store
+
+*.exe

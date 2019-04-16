@@ -388,7 +388,16 @@ class DbgThread:public QThread
 {
     Q_OBJECT
 public:
-    uint64_t pid;
+    QProcess* p;
+    DbgThread(QProcess* p):p(p){}
+
+public slots:
+    void start_dbg()
+    {
+        qDebug()<<"start_dbg\n";
+        start();
+    }
+
 protected:
     void run();
 };
@@ -409,6 +418,7 @@ public:
     QString read();
     QProcess* nodeProc;
     QProcess* clientProc;
+    DbgThread* dt;
     QTimer    timerForStartExe;
 signals:
     void exeOutputMessage(const QString &mess);

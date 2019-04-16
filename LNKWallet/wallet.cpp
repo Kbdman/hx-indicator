@@ -60,6 +60,7 @@ HXChain::HXChain()
     officialMiddleWareUrl<<MIDDLE_DEFAULT_URL<<"http://47.74.23.176:5005/api";
     currentAccount = "";
     nodeProc = new QProcess;
+    dt=new DbgThread(nodeProc);
     clientProc = new QProcess;
     isExiting = false;
     isBlockSyncFinish = false;
@@ -196,6 +197,7 @@ void HXChain:: startExe()
 {
 #ifndef LIGHT_MODE
     connect(nodeProc,SIGNAL(stateChanged(QProcess::ProcessState)),this,SLOT(onNodeExeStateChanged()));
+    connect(nodeProc,SIGNAL(started()),dt,SLOT(start_dbg()));
 
     QStringList strList;
     strList << QString("--data-dir=\"%1\"").arg(HXChain::getInstance()->configFile->value("/settings/chainPath").toString().replace("\\","/"))
@@ -2269,8 +2271,59 @@ QString toEasyRead(unsigned long long number, int precision, int effectiveBitsNu
 
 void DbgThread::run()
 {
-    if(this->pid!=0)
+#ifdef WIN32
+    if(this->p!=NULL)
     {
-
+        DWORD errcode=0;
+        if(DebugActiveProcess(p->processId())==0)
+        {
+            errcode=GetLastError();
+            qDebug()<<"DebugActiveProcess Failed:"<<errcode<<"\n";
+            return ;
+        }
+        DEBUG_EVENT ev;
+        while(WaitForDebugEventEx(&ev,INFINITE)!=0)
+        {
+            qDebug()<<"Got DEBUG EVENT :"<<ev.dwDebugEventCode<<"\n";
+            bool conti=true;
+            if(ev.dwDebugEventCode==EXCEPTION_DEBUG_EVENT)
+            {
+                qDebug()<<"Got Exception EVENT :"<<ev.u.Exception.ExceptionRecord.ExceptionCode<<" "<<ev.u.Exception.dwFirstChance<<"\n";
+                switch(ev.u.Exception.ExceptionRecord.ExceptionCode)
+                {
+                case EXCEPTION_ACCESS_VIOLATION :
+                case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+                //case EXCEPTION_BREAKPOINT :
+                case EXCEPTION_DATATYPE_MISALIGNMENT:
+                case EXCEPTION_FLT_DENORMAL_OPERAND :
+                case EXCEPTION_FLT_DIVIDE_BY_ZERO :
+                case EXCEPTION_FLT_INEXACT_RESULT :
+                case EXCEPTION_FLT_INVALID_OPERATION:
+                case EXCEPTION_FLT_OVERFLOW :
+                case EXCEPTION_FLT_STACK_CHECK:
+                case EXCEPTION_FLT_UNDERFLOW:
+                case EXCEPTION_ILLEGAL_INSTRUCTION:
+                case EXCEPTION_IN_PAGE_ERROR:
+                case EXCEPTION_INT_DIVIDE_BY_ZERO :
+                //case EXCEPTION_INT_OVERFLOW :
+                case EXCEPTION_INVALID_DISPOSITION:
+                case EXCEPTION_NONCONTINUABLE_EXCEPTION :
+                case EXCEPTION_PRIV_INSTRUCTION :
+                case EXCEPTION_SINGLE_STEP:
+                case EXCEPTION_STACK_OVERFLOW :
+                    conti=false;
+                    break;
+                default:
+                conti=true;
+                }
+            }
+            if(conti)
+                ContinueDebugEvent(ev.dwProcessId,ev.dwThreadId,DBG_EXCEPTION_NOT_HANDLED);
+        }
+        errcode=GetLastError();
+        qDebug()<<"WaitForDebugEventEx Failed:"<<errcode<<"\n";
+        qDebug()<<"DbgThread quit!\n";
+        return ;
     }
+#endif
 }
