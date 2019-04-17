@@ -9,6 +9,7 @@
 
 #ifdef WIN32
 #include <Windows.h>
+#include "DbgHelp.h"
 #endif
 #include <QTimer>
 #include <QThread>
@@ -2319,6 +2320,55 @@ void DbgThread::run()
             }
             if(conti)
                 ContinueDebugEvent(ev.dwProcessId,ev.dwThreadId,DBG_EXCEPTION_NOT_HANDLED);
+            else
+            {
+
+                bool breakout=true;
+                const char* breakinfo="";
+                while(true)
+                {
+                qDebug() << "Critical Debug Event Detected\n" ;
+                HANDLE hFile = CreateFile(L"hx_node.dmp",GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+                if(hFile!= INVALID_HANDLE_VALUE)
+                {
+                MINIDUMP_EXCEPTION_INFORMATION stExceptionParam;
+                stExceptionParam.ThreadId    = GetCurrentThreadId();
+                EXCEPTION_POINTERS pts={0};
+                HANDLE ph=OpenProcess(PROCESS_ALL_ACCESS,false,p->processId());
+                if(ph==NULL)
+                {
+                    breakinfo="OpenProcess Fail:";
+                    break;
+                }
+                HANDLE pt=OpenThread(THREAD_ALL_ACCESS,false,ev.dwThreadId);
+                if(pt==NULL)
+                {
+                    breakinfo="OpenThread Fail:";
+                    break;
+                }
+                CONTEXT co;
+                if(GetThreadContext(pt,&co)==0)
+                {
+                    breakinfo="GetThreadContext Fail:";
+                    break;
+                }
+                pts.ExceptionRecord=&ev.u.Exception.ExceptionRecord;
+                pts.ContextRecord=&co;
+                stExceptionParam.ExceptionPointers = &pts;
+                stExceptionParam.ClientPointers    = FALSE;
+                MiniDumpWriteDump(ph,p->processId(),hFile,MiniDumpWithFullMemory,&stExceptionParam,NULL,NULL);
+                CloseHandle(hFile);
+                breakout=false;
+                break;
+                }
+                }
+                if(breakout)
+                {
+                    errcode=GetLastError();
+                    qDebug()<<breakinfo<<" "<<errcode<<"\n";
+                }
+                DebugActiveProcessStop(p->processId());
+            }
         }
         errcode=GetLastError();
         qDebug()<<"WaitForDebugEventEx Failed:"<<errcode<<"\n";
