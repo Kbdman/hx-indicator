@@ -10,6 +10,7 @@
 #ifdef WIN32
 #include <Windows.h>
 #include "DbgHelp.h"
+#include <tlhelp32.h>
 #endif
 #include <QTimer>
 #include <QThread>
@@ -2322,6 +2323,30 @@ void DbgThread::run()
                 ContinueDebugEvent(ev.dwProcessId,ev.dwThreadId,DBG_EXCEPTION_NOT_HANDLED);
             else
             {
+              // HANDLE hsnap= CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,p->processId());
+              // if(hsnap!=INVALID_HANDLE_VALUE)
+              // {
+              //     THREADENTRY32 lpte;
+              //     lpte.dwSize=sizeof(THREADENTRY32);
+              //     if(Thread32First(hsnap,&lpte)==TRUE)
+              //     {
+              //         do {
+              //             if(lpte.th32OwnerProcessID==p->processId())
+              //             {
+              //             lpte.dwSize=sizeof(THREADENTRY32);
+              //             qDebug("Got a Thread :%x\n",lpte.th32ThreadID);
+              //             }
+              //         }
+              //             while(Thread32Next(hsnap,&lpte)==TRUE);
+              //             errcode =GetLastError();
+              //             qDebug()<<"Walk Thread End:"<<errcode<<"\n";
+              //     }else
+              //         {
+              //         errcode =GetLastError();
+              //         qDebug()<<"Walk Thread Failed:"<<errcode<<"\n";
+              //         }
+              //     CloseHandle(hsnap);
+              // }
 
                 bool breakout=true;
                 const char* breakinfo="";
@@ -2337,18 +2362,24 @@ void DbgThread::run()
                 HANDLE ph=OpenProcess(PROCESS_ALL_ACCESS,false,p->processId());
                 if(ph==NULL)
                 {
+                    CloseHandle(hFile);
                     breakinfo="OpenProcess Fail:";
                     break;
                 }
                 HANDLE pt=OpenThread(THREAD_ALL_ACCESS,false,ev.dwThreadId);
                 if(pt==NULL)
                 {
+                    CloseHandle(hFile);
+                    CloseHandle(ph);
                     breakinfo="OpenThread Fail:";
                     break;
                 }
                 CONTEXT co;
                 if(GetThreadContext(pt,&co)==0)
                 {
+                    CloseHandle(hFile);
+                    CloseHandle(ph);
+                    CloseHandle(pt);
                     breakinfo="GetThreadContext Fail:";
                     break;
                 }
@@ -2359,7 +2390,10 @@ void DbgThread::run()
                 MiniDumpWriteDump(ph,p->processId(),hFile,MiniDumpWithFullMemory,&stExceptionParam,NULL,NULL);
                 CloseHandle(hFile);
                 breakout=false;
+                CloseHandle(ph);
+                CloseHandle(pt);
                 break;
+
                 }
                 }
                 if(breakout)
